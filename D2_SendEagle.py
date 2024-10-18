@@ -18,16 +18,13 @@ from .my_types import TNodeParams, TGenInfo
 
 FORCE_WRITE_PROMPT = False
 
-
-
 class D2_SendEagle:
     def __init__(self):
         self.output_dir = folder_paths.get_output_directory()
         self.type = "output"
         self.output_folder = ""
         self.subfolder_name = ""
-        self.eagle_api:EagleAPI = EagleAPI()
-
+        self.eagle_api: EagleAPI = EagleAPI()
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -131,7 +128,7 @@ class D2_SendEagle:
         }
 
         for image in images:
-          results.append(self.create_image_object(image, params))
+            results.append(self.create_image_object(image, params))
 
         if(preview):
             return {
@@ -142,7 +139,6 @@ class D2_SendEagle:
         return {
             "result": (positive, negative, images,)
         }
-
 
     # ######################
     # イメージオブジェクトを作成
@@ -156,9 +152,6 @@ class D2_SendEagle:
         gen_info = paramsExtractor.gen_info
         # EagleやPNGInfo用に整形したもの
         formated_info = paramsExtractor.format_info(params["memo_text"])
-
-        # print("generate_params", gen_info)
-        # print("format_info", formated_info)
 
         # 画像をローカルに保存
         file_name, file_full_path = self.save_image(img, params, gen_info, formated_info)
@@ -186,17 +179,36 @@ class D2_SendEagle:
     # ######################
     # 登録タグを取得
     def get_tags(self, params:TNodeParams, gen_info:TGenInfo) -> list:
+        tags = []
+
         if(params["save_tags"] == "Prompt + Checkpoint"):
-          return [*util.get_prompt_tags(gen_info["positive"]), gen_info["model_name"]]
-
+            tags = [*util.get_prompt_tags(gen_info["positive"]), gen_info["model_name"]]
         elif(params["save_tags"] == "Prompt"):
-          return util.get_prompt_tags(gen_info["positive"])
-
+            tags = util.get_prompt_tags(gen_info["positive"])
         elif(params["save_tags"] == "Checkpoint"):
-          return [gen_info["model_name"]]
+            tags = [gen_info["model_name"]]
 
-        return []
+        # Loraタグをメタデータから抽出
+        lora_tags = self.extract_lora_tags(params.get("extra_pnginfo"))
+        tags.extend(lora_tags)
 
+        return tags
+
+    # ######################
+    # Lora名と強度をメタデータから解析してタグリストとして返す関数
+    def extract_lora_tags(self, metadata: Optional[Dict]) -> list:
+        lora_tags = []
+        if metadata and "Lora Loader Stack (rgthree)" in str(metadata):
+            # メタデータからLora情報を抽出する正規表現
+            lora_pattern = r'\"FLUX\\\\([^"]+).safetensors",\s*([\d\.]+)'
+            matches = re.findall(lora_pattern, str(metadata))
+
+            for match in matches:
+                lora_name = match[0]  # ".safetensors" を取り除いた Lora名
+                lora_strength = match[1]
+                lora_tags.append(f"Lora: {lora_name} (Strength: {lora_strength})")
+
+        return lora_tags
 
     # ######################
     # 画像をローカルに保存
@@ -235,7 +247,6 @@ class D2_SendEagle:
 
         return file_name, file_full_path
 
-
     # ######################
     # 画像保存パスを取得
     def get_output_folder(self):
@@ -249,7 +260,6 @@ class D2_SendEagle:
 
         return output_folder, subfolder_name
 
-
     # ######################
     # 生成パラメーターを取得
     def create_generate_params(self, img, params:TNodeParams) -> ParamsExtractor:
@@ -259,7 +269,6 @@ class D2_SendEagle:
         paramsExtractor.gen_info["height"] = img.height
 
         return paramsExtractor
-
 
     # ######################
     # ファイルネームを取得
